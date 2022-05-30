@@ -1,25 +1,34 @@
-from atexit import register
+import os
 from typing import Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from registry import *
 from registry.db_registry import DbRegistry
 from registry.models import EntityType
 
-app = FastAPI()
+rp = "/"
+try:
+    rp = os.environ["API_BASE"]
+    if rp[0] != '/':
+        rp = '/' + rp
+except:
+    pass
+print("Using API BASE: ", rp)
+
 registry = DbRegistry()
+app = FastAPI()
+router = APIRouter()
 
-
-@app.get("/projects")
+@router.get("/projects")
 def get_projects() -> list[str]:
     return registry.get_projects()
 
 
-@app.get("/projects/{project}")
+@router.get("/projects/{project}")
 def get_projects(project: str) -> dict:
     return registry.get_project(project).to_dict()
 
 
-@app.get("/projects/{project}/datasources")
+@router.get("/projects/{project}/datasources")
 def get_project_datasources(project: str) -> list:
     p = registry.get_entity(project)
     source_ids = [s.id for s in p.attributes.sources]
@@ -27,7 +36,7 @@ def get_project_datasources(project: str) -> list:
     return list([e.to_dict() for e in sources])
 
 
-@app.get("/projects/{project}/features")
+@router.get("/projects/{project}/features")
 def get_project_features(project: str, keyword: Optional[str] = None) -> list:
     if keyword is None:
         p = registry.get_entity(project)
@@ -42,7 +51,7 @@ def get_project_features(project: str, keyword: Optional[str] = None) -> list:
         return list([e.to_dict() for e in features])
 
 
-@app.get("/features/{feature}")
+@router.get("/features/{feature}")
 def get_feature(feature: str) -> dict:
     e = registry.get_entity(feature)
     if e.entity_type not in [EntityType.DerivedFeature, EntityType.AnchorFeature]:
@@ -50,7 +59,10 @@ def get_feature(feature: str) -> dict:
     return e
 
 
-@app.get("/features/{feature}/lineage")
+@router.get("/features/{feature}/lineage")
 def get_feature_lineage(feature: str) -> dict:
     lineage = registry.get_lineage(feature)
     return lineage.to_dict()
+
+
+app.include_router(prefix = rp, router=router)

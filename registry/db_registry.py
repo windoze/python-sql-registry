@@ -164,7 +164,6 @@ class DbRegistry(Registry):
                       keyword: str,
                       type: list[EntityType]) -> list[EntityRef]:
         types = ",".join([quote(str(t)) for t in type])
-        print("XXX", types)
         sql = fr'''select entity_id as id, qualified_name, entity_type as type from entities where qualified_name like %s and entity_type in ({types})'''
         rows = self.conn.execute(sql, ('%' + keyword + '%', ))
         return list([EntityRef(**row) for row in rows])

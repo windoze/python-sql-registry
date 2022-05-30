@@ -1,4 +1,5 @@
 from atexit import register
+from typing import Optional
 from fastapi import FastAPI, HTTPException
 from registry import *
 from registry.db_registry import DbRegistry
@@ -27,12 +28,18 @@ def get_project_datasources(project: str) -> list:
 
 
 @app.get("/projects/{project}/features")
-def get_project_features(project: str) -> list:
-    p = registry.get_entity(project)
-    feature_ids = [s.id for s in p.attributes.anchor_features] + \
-        [s.id for s in p.attributes.derived_features]
-    features = registry.get_entities(feature_ids)
-    return list([e.to_dict() for e in features])
+def get_project_features(project: str, keyword: Optional[str] = None) -> list:
+    if keyword is None:
+        p = registry.get_entity(project)
+        feature_ids = [s.id for s in p.attributes.anchor_features] + \
+            [s.id for s in p.attributes.derived_features]
+        features = registry.get_entities(feature_ids)
+        return list([e.to_dict() for e in features])
+    else:
+        efs = registry.search_entity(keyword, [EntityType.AnchorFeature, EntityType.DerivedFeature])
+        feature_ids = [ef.id for ef in efs]
+        features = registry.get_entities(feature_ids)
+        return list([e.to_dict() for e in features])
 
 
 @app.get("/features/{feature}")

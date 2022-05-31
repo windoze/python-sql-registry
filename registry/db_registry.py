@@ -64,7 +64,7 @@ class DbRegistry(Registry):
 
     def get_project(self, id_or_name: Union[str, UUID]) -> EntitiesAndRelations:
         project = self._get_entity(id_or_name)
-        edges = self.get_neighbors(id_or_name, RelationshipType.Contains)
+        edges = set(self.get_neighbors(id_or_name, RelationshipType.Contains))
         ids = list([e.to_id for e in edges])
         children = self._get_entities(ids)
         child_map = dict([(e.id, e) for e in children])
@@ -72,7 +72,7 @@ class DbRegistry(Registry):
         for anchor in project.attributes.anchors:
             conn = self.get_neighbors(anchor.id, RelationshipType.Contains)
             feature_ids = [e.to_id for e in conn]
-            edges.extend(conn)
+            edges = edges.union(conn)
             features = list([child_map[id] for id in feature_ids])
             anchor.attributes.features = features
             source_id = self.get_neighbors(anchor.id, RelationshipType.Consumes)[0].to_id
@@ -80,10 +80,11 @@ class DbRegistry(Registry):
         for df in project.attributes.derived_features:
             conn = self.get_neighbors(anchor.id, RelationshipType.Consumes)
             input_ids = [e.to_id for e in conn]
-            edges.extend(conn)
+            edges = edges.union(conn)
             features = list([child_map[id] for id in input_ids])
             df.attributes.input_features = features
-        return EntitiesAndRelations([project] + children, edges)
+        all_edges = self._get_edges(ids)
+        return EntitiesAndRelations([project] + children, list(edges.union(all_edges)))
     
     def _fill_entity(self, e: Entity) -> Entity:
         if e.entity_type == EntityType.Project:
@@ -108,6 +109,18 @@ class DbRegistry(Registry):
             e.attributes.input_features = features
             return e
         return e
+    
+    def _get_edges(self, ids: list[UUID], types: list[RelationshipType] = []) -> list[Edge]:
+        sql = fr"""select edge_id, from_id, to_id, conn_type from edges
+        where from_id in ({quote(ids)})
+        and to_id in ({quote(ids)})"""
+        if len(types)>0:
+            sql = fr"""select edge_id, from_id, to_id, conn_type from edges
+            where conn_type in ({quote(types)})
+            and from_id in ({quote(ids)})
+            and to_id in ({quote(ids)})"""
+        rows = self.conn.execute(sql)
+        return list([to_type(row, Edge) for row in rows])
     
     def _get_entity(self, id_or_name: Union[str, UUID]) -> Entity:
         row = self.conn.execute(fr'''

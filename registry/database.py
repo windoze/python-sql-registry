@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import threading
-from distutils.log import debug
+from distutils.log import debug, warn
 import os
 import pymssql
 
@@ -42,20 +42,35 @@ class MssqlConnection(DbConnection):
         if "Server=" not in conn_str:
             debug("`CONNECTION_STR` is not in ADO connection string format")
             return None
-        conn = pymssql.connect(**parse_conn_str(conn_str))
-        return MssqlConnection(conn)
+        return MssqlConnection(parse_conn_str(conn_str))
 
-    def __init__(self, conn):
-        self.conn = conn
+    def __init__(self, params):
+        self.params = params
+        self.make_connection()
         self.mutex = threading.Lock()
+        
+    def make_connection(self):
+        self.conn = pymssql.connect(**self.params)
 
     def execute(self, sql: str, *args, **kwargs) -> list[dict]:
         debug(f"SQL: `{sql}`")
         # NOTE: Only one cursor is allowed at the same time
-        with self.mutex:
-            c = self.conn.cursor(as_dict=True)
-            c.execute(sql, *args, **kwargs)
-            return c.fetchall()
+        retry = 0
+        while True:
+            try:
+                with self.mutex:
+                    c = self.conn.cursor(as_dict=True)
+                    c.execute(sql, *args, **kwargs)
+                    return c.fetchall()
+            except pymssql.OperationalError:
+                warn("Database error, retrying...")
+                # Reconnect
+                self.make_connection()
+                retry += 1
+                if retry >= 3:
+                    # Stop retrying
+                    raise
+                pass
 
 
 providers.append(MssqlConnection)

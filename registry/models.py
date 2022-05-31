@@ -277,7 +277,8 @@ class Entity(ToDict):
         if isinstance(attributes, Attributes):
             self.attributes = attributes
         else:
-            self.attributes = Attributes.new(entity_type, **to_snake(attributes))
+            self.attributes = Attributes.new(
+                entity_type, **to_snake(attributes))
 
     def get_ref(self) -> EntityRef:
         return EntityRef(self.id,
@@ -304,7 +305,7 @@ class ProjectAttributes(Attributes):
         self.name = name
         self.tags = tags
         self._children = []
-        if len(children)>0:
+        if len(children) > 0:
             self.children = children
 
     @property
@@ -522,7 +523,7 @@ class DerivedFeatureAttributes(Attributes):
     @property
     def input_features(self):
         return self._input_anchor_features + self._input_derived_features
-    
+
     @input_features.setter
     def input_features(self, v: Union[dict, Entity]):
         self._input_anchor_features = []
@@ -535,7 +536,7 @@ class DerivedFeatureAttributes(Attributes):
                 e = to_type(f, Entity)
             else:
                 raise TypeError(f)
-            
+
             if e.entity_type == EntityType.AnchorFeature:
                 self._input_anchor_features.append(e)
             elif e.entity_type == EntityType.DerivedFeature:
@@ -602,6 +603,13 @@ class Edge(ToDict):
         self.from_id = to_uuid(from_id)
         self.to_id = to_uuid(to_id)
         self.conn_type = to_type(conn_type, RelationshipType)
+
+    def __eq__(self, o: object) -> bool:
+        # Edge ID is kinda useless
+        return self.from_id == o.from_id and self.to_id == o.to_id and self.conn_type == o.conn_type
+
+    def __hash__(self) -> int:
+        return hash((self.from_id, self.to_id, self.conn_type))
 
     def to_dict(self) -> dict:
         return {

@@ -1,6 +1,7 @@
 import os
 from typing import Optional
 from fastapi import APIRouter, FastAPI, HTTPException
+from starlette.middleware.cors import CORSMiddleware
 from registry import *
 from registry.db_registry import DbRegistry
 from registry.models import EntityType
@@ -17,6 +18,14 @@ print("Using API BASE: ", rp)
 registry = DbRegistry()
 app = FastAPI()
 router = APIRouter()
+
+# Enables CORS
+app.add_middleware(CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @router.get("/projects")
 def get_projects() -> list[str]:
